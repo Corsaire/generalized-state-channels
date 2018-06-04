@@ -12,8 +12,14 @@ contract StateChannelsManager {
         uint extra;        
     }
 
+    struct State
+    {
+        uint txNumber;        
+        bytes state;
+    }
+
     Status status = Status.Initialize;
-    bytes state;
+    State lastState;
 
     uint initialized = 0; 
     uint playersCount;
@@ -44,9 +50,10 @@ contract StateChannelsManager {
     }
 
     function register() public payable
+    isStatus(Status.Initialize)
+    isPlayer
     {
         Player storage player = players[msg.sender];
-        require(player.addr == msg.sender);
         require(player.registred == false);
         require(player.deposit + player.extra == msg.value);
         player.registred = true;
@@ -55,8 +62,49 @@ contract StateChannelsManager {
             start();
     }
 
-    function start() public 
+    function start() private 
     {
+        status = Status.Started;
+
+    }
+
+    function disputeClose()
+    {
+
+    }
+
+    function disputeWaitingForTX()
+    {
+
+    }
+
+    function disputeWaitingForSig()
+    {
+
+    }
+
+    function submitState(bytes state, uint8 v1, bytes32 r1, bytes32 s1, uint8 v2, bytes32 r2, bytes32 s2)
+    {
+        bytes32 stateHash = keccak256(state, address(this));
+    }
+
+    
+    function confirmState(address addr, bytes32 _hash, uint8 v, bytes32 r, bytes32 s)
+    private
+    returns(bool)
+    {
+        require(addr == ecrecover(_hash,v,r,s));
+    }
+
+    function dispute(bytes state, bytes32 transaction, address player, uint8 v, bytes32 r, bytes32 s) public
+    isStatus(Status.Started)
+    isPlayer
+    {
+        require(msg.sender != signer);
+        bytes32 txHash = keccak256(state, transaction);
+        address signer = ecrecover(txHash,v,r,s);
+        require(signer == player);
+        require(players[player].registred);
         
     }
 
