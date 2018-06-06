@@ -1,8 +1,10 @@
 pragma solidity 0.4.23;
 
+import "./IStateMachine.sol";
+
 contract StateChannelsManager {
 
-    enum Status { Initialize, Started }
+    enum Status { Initialize, Started, Dispute }
 
     struct Player
     {
@@ -20,11 +22,16 @@ contract StateChannelsManager {
 
     Status status = Status.Initialize;
     State lastState;
+    IStateMachine sm;
 
     uint initialized = 0; 
-    uint playersCount;
+
+    uint deadline;
+    
 
     mapping(address => Player) players;
+    address player1;
+    address player2;
 
     modifier isPlayer()
     {
@@ -41,7 +48,7 @@ contract StateChannelsManager {
     constructor(address[] _ads, uint[] _deposits, uint[] _extras) public 
     {
         playersCount = _ads.length;
-        require(playersCount >= 1);
+        require(playersCount == 2);
         require(playersCount == _deposits.length);
         require(playersCount == _extras.length);
 
@@ -68,44 +75,55 @@ contract StateChannelsManager {
 
     }
 
-    function disputeClose()
+    function close() public
+    {
+        if(sm.canClose())
+        {
+            
+        }
+    }
+
+    function disputeWaitingForTX() public
     {
 
     }
 
-    function disputeWaitingForTX()
+    function disputeWaitingForSig() public
     {
 
     }
 
-    function disputeWaitingForSig()
+    /**
+        This method is called by a party, if counterparty denies to sign transaction.
+     */
+    function subitTX(bytes transaction, bytes newState) 
+    isPlayer
+    public
     {
-
+        sm.verifyTx(lastState.state, transaction, newState);
     }
 
-    function submitState(bytes state, uint8 v1, bytes32 r1, bytes32 s1, uint8 v2, bytes32 r2, bytes32 s2)
+    function submitState(uint txCount, bytes state, uint8 v1, bytes sig1, bytes sig2) external
     {
-        bytes32 stateHash = keccak256(state, address(this));
+        require(txCount > lastState.txNumber);
+        bytes32 stateHash = keccak256(txCount, state, address(this));
+        require(confirmState(player1, stateHash, sig1));
+        require(confirmState(player2, stateHash, sig2));
     }
-
     
-    function confirmState(address addr, bytes32 _hash, uint8 v, bytes32 r, bytes32 s)
-    private
+    function confirmState(address addr, bytes32 _hash, bytes sig)
+    external
     returns(bool)
     {
-        require(addr == ecrecover(_hash,v,r,s));
-    }
-
-    function dispute(bytes state, bytes32 transaction, address player, uint8 v, bytes32 r, bytes32 s) public
-    isStatus(Status.Started)
-    isPlayer
-    {
-        require(msg.sender != signer);
-        bytes32 txHash = keccak256(state, transaction);
-        address signer = ecrecover(txHash,v,r,s);
-        require(signer == player);
-        require(players[player].registred);
-        
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+        assembly {
+            v := calldataload(sig)
+            r := calldataload(add(sig, 1))
+            s := calldataload(add(sig, 33))
+        }
+        return (addr == ecrecover(_hash,v,r,s));
     }
 
 }
